@@ -1,0 +1,14 @@
+{
+  "name": "arena-distribuida-pong",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @arena/server --filter @arena/client dev",
+    "build": "pnpm --filter @arena/shared build && pnpm --filter @arena/server build && pnpm --filter @arena/client build",
+    "typecheck": "pnpm --filter @arena/shared typecheck && pnpm --filter @arena/server typecheck && pnpm --filter @arena/client typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
