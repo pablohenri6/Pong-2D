@@ -11,9 +11,12 @@ const BALL_RADIUS = 10;
 const BALL_INITIAL_SPEED_X = 360;
 const BALL_INITIAL_SPEED_Y = 210;
 const BALL_INITIAL_SPEED = Math.hypot(BALL_INITIAL_SPEED_X, BALL_INITIAL_SPEED_Y);
-const HITS_TO_MAX_SPEED = 30;
+const HITS_TO_MAX_SPEED = 32;
 const BALL_MAX_SPEED = BALL_INITIAL_SPEED * 2.2;
-const BALL_ACCEL_FACTOR = Math.pow(BALL_MAX_SPEED / BALL_INITIAL_SPEED, 1 / HITS_TO_MAX_SPEED);
+// Early hits get a stronger push; acceleration tapers as progress approaches max (~32 hits to cap).
+const BALL_ACCEL_BOOST = (BALL_MAX_SPEED - BALL_INITIAL_SPEED) * 0.101; // ~+50.5 px/s at low speed
+const BALL_ACCEL_FLOOR = (BALL_MAX_SPEED - BALL_INITIAL_SPEED) * 0.0156; // ~+7.8 px/s near cap
+const BALL_ACCEL_TAPER = 1.42;
 
 export interface AuthoritativeGameState {
   paddles: { playerOne: PaddleState; playerTwo: PaddleState };
@@ -118,7 +121,9 @@ function accelerateAfterPaddleHit(
       velocityY: BALL_INITIAL_SPEED_Y,
     };
   }
-  const nextMagnitude = Math.min(magnitude * BALL_ACCEL_FACTOR, BALL_MAX_SPEED);
+  const progress = Math.min(1, Math.max(0, (magnitude - BALL_INITIAL_SPEED) / (BALL_MAX_SPEED - BALL_INITIAL_SPEED)));
+  const acceleration = BALL_ACCEL_BOOST * Math.pow(1 - progress, BALL_ACCEL_TAPER) + BALL_ACCEL_FLOOR;
+  const nextMagnitude = Math.min(magnitude + acceleration, BALL_MAX_SPEED);
   const normalizedX = ball.velocityX / magnitude;
   const normalizedY = ball.velocityY / magnitude;
   const velocityX = (horizontalDirection === "RIGHT" ? Math.abs(normalizedX) : -Math.abs(normalizedX)) * nextMagnitude;

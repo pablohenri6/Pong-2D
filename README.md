@@ -28,12 +28,18 @@ O estado é mantido apenas em memória. Cada sala possui as conexões dos jogado
 A física roda exclusivamente em `server/src/game-engine.ts` a 30 ticks/s. A bola acelera a cada colisão com qualquer raquete para aumentar a intensidade dos ralis, mantendo determinismo e limite de segurança:
 
 - **Gatilho:** cada rebatida em `PLAYER_ONE` ou `PLAYER_TWO` aumenta a magnitude da velocidade.
-- **Progressão:** escala geométrica por rebatida, calibrada para atingir a velocidade máxima após **30 rebatidas** em um mesmo rali.
-- **Velocidade inicial:** componentes `(360, 210)` px/s, magnitude `~416,77` px/s.
-- **Velocidade máxima:** `2,2x` a magnitude inicial (`~916,90` px/s, `~30,56` px/tick a 30 ticks/s).
-- **Fator por rebatida:** `(máx/inicial)^(1/30) = ~1,02663` por hit, com clamp no máximo.
+- **Progressão:** curva aditiva com ganho maior no início e desaceleração gradual conforme a velocidade se aproxima do teto; calibrada para atingir a velocidade máxima após **32 rebatidas** em um mesmo rali.
+- **Velocidade inicial:** componentes `(360, 210)` px/s, magnitude `v0 = hypot(360, 210) = ~416,77` px/s.
+- **Velocidade máxima:** `vmax = 2,2 * v0 = ~916,90` px/s (`~30,56` px/tick a 30 ticks/s), com `range = vmax - v0 = ~500,13` px/s.
+- **Matemática da curva (por rebatida):**
+  - progresso normalizado: `p = clamp((|v| - v0) / range, 0, 1)`, onde `|v| = hypot(vx, vy)` antes do hit (`p=0` no saque, `p=1` no teto)
+  - incremento de magnitude: `a(p) = boost * (1 - p)^taper + floor`
+  - constantes: `boost = 0,101 * range = ~50,51 px/s`, `floor = 0,0156 * range = ~7,80 px/s`, `taper = 1,42`
+  - atualização: `|v_next| = min(|v| + a(p), vmax)`; o vetor velocidade é normalizado e reescalado para `|v_next|`, com a componente horizontal forçada para longe da raquete atingida
+  - efeito: nos primeiros hits `(1-p)^1,42` fica próximo de 1 (ganho forte, ~`+50,5` px/s); à medida que `p` cresce, o termo cai de forma supralinear e o ganho converge para o piso (~`+7,8` px/s) até o clamp em `vmax`
 - **Direção:** a direção horizontal é invertida para longe da raquete atingida; o vetor é normalizado e reescalado para preservar o ângulo relativo com aceleração consistente.
 - **Reset:** a velocidade volta ao valor inicial em todo saque/nova rodada, nova partida, revanche e retorno ao estado de espera (`createInitialGameState` / `createNextRound`).
+- **Feedback visual (cliente):** o canvas exibe rótulos curtos acima da bola ao detectar inversão horizontal de uma rebatida (`Nice hit!`, `Speed up!`, `Pow!`, `Zoom!`, `Faster!`). Esse feedback é apenas visual/preditivo no cliente; o estado autoritativo e o contrato de rede não mudam.
 
 O contrato compartilhado (`shared/src/types.ts`) continua estável: `BallState` na rede expõe apenas `x`, `y` e `radius`; as componentes de velocidade permanecem internas ao motor.
 
@@ -154,8 +160,8 @@ WAITING -- dois jogadores --> PLAYING -- ponto --> PAUSED -- 1 segundo --> PLAYI
 | Espectador | Abra um terceiro navegador e entre no mesmo código. | Papel Espectador; canvas acompanha a partida; controles ficam indisponíveis. |
 | Input inválido | Em desenvolvimento, abra DevTools -> Console em um cliente conectado e execute `window.__arenaSocket.emit("message", { type: "INPUT", direction: "TELEPORT" })`. | O console de rede recebe `ERROR` com `INVALID_PAYLOAD`; o servidor continua ativo e registra a rejeição. |
 | Duas salas | Crie duas salas diferentes, com dois jogadores em cada uma. | Placares, bola e mensagens não vazam entre salas. |
-| Aceleração da bola | Em dois clientes, mantenha um rali longo sem marcar ponto. | A bola acelera a cada rebatida, atinge um teto perceptível após ~30 rebatidas e mantém colisões/placar corretos. |
-| Reset após ponto | Marque um ponto durante um rali acelerado e observe o saque. | A velocidade volta ao padrão inicial na nova rodada; após revanche/fim de partida, o reset permanece correto. |
+| Aceleração da bola | Em dois clientes, mantenha um rali longo sem marcar ponto. | A bola acelera visivelmente mais nas primeiras rebatidas, exibe rótulos curtos acima dela a cada batida, atinge um teto perceptível após ~32 rebatidas e mantém colisões/placar corretos. |
+| Reset após ponto | Marque um ponto durante um rali acelerado e observe o saque. | A velocidade volta ao padrão inicial na nova rodada e os rótulos visuais de rebatida não persistem; após revanche/fim de partida, o reset permanece correto. |
 | Desconexão | Feche a aba de um jogador no meio de um ponto. | O restante recebe "Oponente desconectado"; sala retorna a `WAITING`; servidor continua ativo. |
 | Revanche | Termine uma partida (5 pontos) e pressione "Pedir revanche" nos dois jogadores. | Nova partida começa na mesma sala com placar da partida zerado; vitórias da sessão preservadas. |
 | Tráfego WebSocket | Abra DevTools -> Network -> WS -> conexão Socket.IO -> Frames. | Frames `message` mostram o contrato e `GAME_STATE` com `version` crescente. |
@@ -169,7 +175,7 @@ server/src/game-engine.ts  # física, regras, aceleração e resets da bola
 server/src/rooms.ts        # estado em memória e papéis
 server/src/index.ts        # Socket.IO, loop e difusão
 client/src/hooks/          # comunicação Socket.IO
-client/src/components/     # lobby, canvas e tela do jogo
+client/src/components/     # lobby, canvas e tela do jogo (inclui feedback visual de rebatida)
 shared/src/types.ts        # contrato compartilhado
 plans/                     # planos de implementação e prompts
 ```
