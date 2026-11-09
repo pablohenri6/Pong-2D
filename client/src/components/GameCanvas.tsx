@@ -1,6 +1,15 @@
 import { useEffect, useRef } from "react";
 import { GAME_HEIGHT, GAME_WIDTH, type GameStateMessage } from "@arena/shared";
 
+interface HitEffect {
+  x: number;
+  y: number;
+  text: string;
+  createdAt: number;
+}
+
+const HIT_LABELS = ["Nice hit!", "Speed up!", "Pow!", "Zoom!", "Faster!"];
+
 // Posição X das torres decorativas laterais (igual ao TOWER_OFFSET do servidor)
 const TOWER_OFFSET = 55;
 
@@ -151,11 +160,58 @@ function shadeColor(hex: string, percent: number): string {
 
 export function GameCanvas({ gameState }: { gameState: GameStateMessage | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef<GameStateMessage | null>(gameState);
+  const previousBallRef = useRef<{ x: number; y: number; dx: number } | null>(null);
+  const previousScoreRef = useRef<string | null>(null);
+  const rallyHitsRef = useRef(0);
+  const hitEffectsRef = useRef<HitEffect[]>([]);
+
+  useEffect(() => {
+    stateRef.current = gameState;
+    if (!gameState) return;
+
+    const scoreKey = `${gameState.roomCode}:${gameState.score.playerOne}:${gameState.score.playerTwo}`;
+    if (previousScoreRef.current !== scoreKey) {
+      previousScoreRef.current = scoreKey;
+      rallyHitsRef.current = 0;
+      hitEffectsRef.current = [];
+      previousBallRef.current = null;
+    }
+
+    if (gameState.status !== "PLAYING") {
+      previousBallRef.current = { x: gameState.ball.x, y: gameState.ball.y, dx: 0 };
+      return;
+    }
+
+    const previous = previousBallRef.current;
+    const current = gameState.ball;
+    if (previous) {
+      const dx = current.x - previous.x;
+      const jumped = Math.hypot(current.x - previous.x, current.y - previous.y) > 140;
+      const bounced = !jumped && Math.abs(previous.dx) > 0.5 && Math.abs(dx) > 0.5 && Math.sign(previous.dx) !== Math.sign(dx);
+      if (bounced) {
+        rallyHitsRef.current += 1;
+        const text = HIT_LABELS[Math.min(rallyHitsRef.current - 1, HIT_LABELS.length - 1)];
+        hitEffectsRef.current.push({ x: current.x, y: Math.max(28, current.y - 18), text, createdAt: performance.now() });
+      }
+      previousBallRef.current = { x: current.x, y: current.y, dx: Math.abs(dx) > 0.01 ? dx : previous.dx };
+    } else {
+      previousBallRef.current = { x: current.x, y: current.y, dx: 0 };
+    }
+  }, [gameState]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx || !gameState) return;
+    if (!canvas || !ctx) return;
+
+    let frame = 0;
+    const draw = () => {
+      const state = stateRef.current;
+      if (!state) {
+        frame = requestAnimationFrame(draw);
+        return;
+      }
 
     // --- FUNDO ---
     const bg = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
@@ -209,15 +265,35 @@ export function GameCanvas({ gameState }: { gameState: GameStateMessage | null }
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // --- ESCUDOS DOS JOGADORES ---
-    const { playerOne: p1, playerTwo: p2 } = gameState.paddles;
-    drawShield(ctx, p1.x, p1.y, p1.width, p1.height, true, p1.health ?? 100);
-    drawShield(ctx, p2.x, p2.y, p2.width, p2.height, false, p2.health ?? 100);
+      // --- ESCUDOS DOS JOGADORES ---
+      const { playerOne: p1, playerTwo: p2 } = state.paddles;
+      drawShield(ctx, p1.x, p1.y, p1.width, p1.height, true, p1.health ?? 100);
+      drawShield(ctx, p2.x, p2.y, p2.width, p2.height, false, p2.health ?? 100);
 
-    // --- BOLA DE FOGO ---
-    const { ball } = gameState;
-    drawFireball(ctx, ball.x, ball.y, ball.radius);
-  }, [gameState]);
+      // --- BOLA DE FOGO ---
+      const { ball } = state;
+      drawFireball(ctx, ball.x, ball.y, ball.radius);
+
+      const now = performance.now();
+      hitEffectsRef.current = hitEffectsRef.current.filter((effect) => now - effect.createdAt < 700);
+      for (const effect of hitEffectsRef.current) {
+        const age = (now - effect.createdAt) / 700;
+        ctx.save();
+        ctx.globalAlpha = 1 - age;
+        ctx.fillStyle = "#fde047";
+        ctx.font = "bold 18px Inter, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(effect.text, effect.x, effect.y - age * 18);
+        ctx.restore();
+      }
+
+      frame = requestAnimationFrame(draw);
+    };
+
+    frame = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <canvas
