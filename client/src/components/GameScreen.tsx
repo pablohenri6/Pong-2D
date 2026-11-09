@@ -57,13 +57,13 @@ export function GameScreen({ roomCode, role, gameState, opponentDisconnected, re
       </header>
       <div className="grid grid-cols-3 items-center text-center"><div><p className="text-xs uppercase tracking-widest text-cyan-300">{players.playerOne ?? "Jogador 1"}</p><p className="text-4xl font-black">{score.playerOne}</p></div><p className="text-lg font-bold text-slate-500">×</p><div><p className="text-xs uppercase tracking-widest text-pink-300">{players.playerTwo ?? "Jogador 2"}</p><p className="text-4xl font-black">{score.playerTwo}</p></div></div>
       <GameCanvas gameState={gameState} />
-      {opponentDisconnected && (
+      {opponentDisconnected && role !== "SPECTATOR" && (
         <section className="mx-auto grid w-full max-w-2xl gap-4 rounded-2xl border border-amber-400/50 bg-amber-950/40 p-5 text-center">
           <p className="text-lg font-bold text-amber-100">{opponentDisconnected}</p>
           <button type="button" onClick={onLeave} className="rounded-xl border border-slate-500 bg-slate-800 px-6 py-4 text-lg font-black text-white transition hover:border-slate-300 hover:bg-slate-700">Sair</button>
         </section>
       )}
-      {gameState?.status === "FINISHED" && role !== "SPECTATOR" && (
+      {!opponentDisconnected && gameState?.status === "FINISHED" && role !== "SPECTATOR" && (
         <section className="mx-auto grid w-full max-w-2xl gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-5 text-center">
           {awaitingOpponent && <p className="font-semibold text-cyan-200">Aguardando o oponente aceitar a revanche…</p>}
           {canRespondToRematch && <p className="font-semibold text-cyan-200">Seu oponente pediu uma revanche. Você aceita?</p>}
