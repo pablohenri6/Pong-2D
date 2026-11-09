@@ -8,8 +8,12 @@ const PADDLE_WIDTH = 16;
 const PADDLE_HEIGHT = 112;
 const PADDLE_SPEED = 420;
 const BALL_RADIUS = 10;
-const BALL_SPEED_X = 360;
-const BALL_SPEED_Y = 210;
+const BALL_INITIAL_SPEED_X = 360;
+const BALL_INITIAL_SPEED_Y = 210;
+const BALL_INITIAL_SPEED = Math.hypot(BALL_INITIAL_SPEED_X, BALL_INITIAL_SPEED_Y);
+const HITS_TO_MAX_SPEED = 30;
+const BALL_MAX_SPEED = BALL_INITIAL_SPEED * 2.2;
+const BALL_ACCEL_FACTOR = Math.pow(BALL_MAX_SPEED / BALL_INITIAL_SPEED, 1 / HITS_TO_MAX_SPEED);
 
 export interface AuthoritativeGameState {
   paddles: { playerOne: PaddleState; playerTwo: PaddleState };
@@ -41,8 +45,8 @@ export function createInitialGameState(serveTo: "PLAYER_ONE" | "PLAYER_TWO" = "P
       x: GAME_WIDTH / 2,
       y: GAME_HEIGHT / 2,
       radius: BALL_RADIUS,
-      velocityX: serveTo === "PLAYER_TWO" ? BALL_SPEED_X : -BALL_SPEED_X,
-      velocityY: BALL_SPEED_Y,
+      velocityX: serveTo === "PLAYER_TWO" ? BALL_INITIAL_SPEED_X : -BALL_INITIAL_SPEED_X,
+      velocityY: BALL_INITIAL_SPEED_Y,
     },
     score: { playerOne: 0, playerTwo: 0 },
   };
@@ -70,9 +74,9 @@ export function advanceGame(game: AuthoritativeGameState, inputs: PlayerInputs, 
   }
 
   if (ball.velocityX < 0 && intersectsPaddle(ball, playerOne)) {
-    ball = { ...ball, x: playerOne.x + playerOne.width + ball.radius, velocityX: Math.abs(ball.velocityX) };
+    ball = accelerateAfterPaddleHit(ball, playerOne.x + playerOne.width + ball.radius, "RIGHT");
   } else if (ball.velocityX > 0 && intersectsPaddle(ball, playerTwo)) {
-    ball = { ...ball, x: playerTwo.x - ball.radius, velocityX: -Math.abs(ball.velocityX) };
+    ball = accelerateAfterPaddleHit(ball, playerTwo.x - ball.radius, "LEFT");
   }
 
   if (ball.x + ball.radius < 0) {
@@ -98,6 +102,27 @@ function movePaddle(paddle: PaddleState, direction: PaddleDirection, deltaSecond
   const verticalMultiplier = direction === "UP" ? -1 : direction === "DOWN" ? 1 : 0;
   const y = Math.max(0, Math.min(GAME_HEIGHT - paddle.height, paddle.y + verticalMultiplier * PADDLE_SPEED * deltaSeconds));
   return { ...paddle, y };
+}
+
+function accelerateAfterPaddleHit(
+  ball: AuthoritativeGameState["ball"],
+  x: number,
+  horizontalDirection: "LEFT" | "RIGHT",
+): AuthoritativeGameState["ball"] {
+  const magnitude = Math.hypot(ball.velocityX, ball.velocityY);
+  if (magnitude === 0) {
+    return {
+      ...ball,
+      x,
+      velocityX: horizontalDirection === "RIGHT" ? BALL_INITIAL_SPEED_X : -BALL_INITIAL_SPEED_X,
+      velocityY: BALL_INITIAL_SPEED_Y,
+    };
+  }
+  const nextMagnitude = Math.min(magnitude * BALL_ACCEL_FACTOR, BALL_MAX_SPEED);
+  const normalizedX = ball.velocityX / magnitude;
+  const normalizedY = ball.velocityY / magnitude;
+  const velocityX = (horizontalDirection === "RIGHT" ? Math.abs(normalizedX) : -Math.abs(normalizedX)) * nextMagnitude;
+  return { ...ball, x, velocityX, velocityY: normalizedY * nextMagnitude };
 }
 
 function intersectsPaddle(ball: AuthoritativeGameState["ball"], paddle: PaddleState): boolean {
