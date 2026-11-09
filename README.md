@@ -164,7 +164,8 @@ WAITING -- dois jogadores --> PLAYING -- ponto --> PAUSED -- 1 segundo --> PLAYI
 | Aceleração da bola | Em dois clientes, mantenha um rali longo sem marcar ponto. | A bola acelera visivelmente mais nas primeiras rebatidas, exibe rótulos curtos acima dela a cada batida, atinge um teto perceptível após ~32 rebatidas e mantém colisões/placar corretos. |
 | Reset após ponto | Marque um ponto durante um rali acelerado e observe o saque. | A velocidade volta ao padrão inicial na nova rodada e os rótulos visuais de rebatida não persistem; após revanche/fim de partida, o reset permanece correto. |
 | Desconexão | Feche a aba de um jogador no meio de um ponto. | O restante recebe "Oponente desconectado"; sala retorna a `WAITING`; servidor continua ativo. |
-| Revanche | Termine uma partida (5 pontos) e pressione "Pedir revanche" nos dois jogadores. | Nova partida começa na mesma sala com placar da partida zerado; vitórias da sessão preservadas. |
+| Fim de partida (overlay) | Termine uma partida (5 pontos) em dois clientes e observe o terceiro como espectador (se houver). | Jogadores veem overlay sobre a área do jogo com **“Você venceu”** ou **“Você perdeu”** (perspectiva local), placar final e botões **Revanche**/**Sair**; espectador vê estado neutro de partida finalizada sem win/lose pessoal. |
+| Revanche | No overlay de fim de partida, pressione **Revanche** nos dois jogadores (ou aceite/recuse conforme o fluxo). | Revanche mantém negociação existente (aguardar oponente, aceitar/recusar); ao aceitar, nova partida começa na mesma sala com placar da partida zerado e vitórias da sessão preservadas. |
 | Tráfego WebSocket | Abra DevTools -> Network -> WS -> conexão Socket.IO -> Frames. | Frames `message` mostram o contrato e `GAME_STATE` com `version` crescente. |
 
 `window.__arenaSocket` existe apenas quando o Vite está em modo de desenvolvimento e serve exclusivamente para o teste de robustez acima.

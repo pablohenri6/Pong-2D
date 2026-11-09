@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { GameStateMessage, PaddleDirection, PlayerRole } from "@arena/shared";
 import { GameCanvas } from "./GameCanvas";
 
@@ -33,6 +33,10 @@ function statusText(
   return gameState.winner === role ? "🏆 Vitória! Glória ao castelo!" : "💀 Derrota — o castelo caiu";
 }
 
+function playerOutcomeText(gameState: GameStateMessage, role: "PLAYER_ONE" | "PLAYER_TWO"): string {
+  return gameState.winner === role ? "Você venceu" : "Você perdeu";
+}
+
 export function GameScreen({
   roomCode,
   role,
@@ -49,6 +53,16 @@ export function GameScreen({
   const declinedBy = rematch && "declinedBy" in rematch ? rematch.declinedBy : null;
   const awaitingOpponent = requester === role;
   const canRespondToRematch = requester !== null && requester !== role;
+  const finished = gameState?.status === "FINISHED";
+  const showDisconnectOverlay = Boolean(opponentDisconnected) && role !== "SPECTATOR";
+  const showFinishedOverlay = finished && !showDisconnectOverlay;
+  const overlayPrimaryRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (showDisconnectOverlay || showFinishedOverlay) {
+      overlayPrimaryRef.current?.focus();
+    }
+  }, [showDisconnectOverlay, showFinishedOverlay, awaitingOpponent, canRespondToRematch, declinedBy, role, gameState?.winner]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -134,107 +148,183 @@ export function GameScreen({
         </div>
       </div>
 
-      {/* Canvas do jogo */}
-      <GameCanvas gameState={gameState} />
+      {/* Canvas do jogo + overlays */}
+      <div className="relative">
+        <GameCanvas gameState={gameState} />
 
-      {/* Oponente desconectou */}
-      {opponentDisconnected && role !== "SPECTATOR" && (
-        <section
-          className="mx-auto grid w-full max-w-2xl gap-4 rounded-2xl p-5 text-center"
-          style={{ background: "rgba(120,53,15,0.3)", border: "1px solid rgba(217,119,6,0.5)" }}
-        >
-          <p className="text-lg font-bold text-amber-100">{opponentDisconnected}</p>
-          <button
-            type="button"
-            onClick={onLeave}
-            className="rounded-xl px-6 py-4 text-lg font-black text-white transition"
-            style={{ background: "#2d2640", border: "1px solid #6d5e9c" }}
+        {showDisconnectOverlay && (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center rounded-xl p-4"
+            style={{ background: "rgba(13,11,26,0.78)", backdropFilter: "blur(2px)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="disconnect-overlay-title"
           >
-            Voltar ao Lobby
-          </button>
-        </section>
-      )}
-
-      {/* Fim de partida — revanche */}
-      {!opponentDisconnected && gameState?.status === "FINISHED" && role !== "SPECTATOR" && (
-        <section
-          className="mx-auto grid w-full max-w-2xl gap-3 rounded-2xl p-5 text-center"
-          style={{ background: "linear-gradient(to bottom, #2d2640, #151122)", border: "1px solid #6d5e9c" }}
-        >
-          {awaitingOpponent && (
-            <p className="font-semibold text-amber-200">Aguardando o oponente aceitar a revanche…</p>
-          )}
-          {canRespondToRematch && (
-            <p className="font-semibold text-amber-200">Seu oponente desafia você para uma revanche. Aceita?</p>
-          )}
-          {declinedBy && (
-            <p className="font-semibold text-red-300">
-              {declinedBy === role ? "Você recusou a revanche." : "Revanche recusada pelo oponente."}
-            </p>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2 mt-2">
-            {canRespondToRematch ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onRespondRematch(true)}
-                  className="rounded-xl px-6 py-5 text-lg font-black text-white transition"
-                  style={{ background: "linear-gradient(135deg, #b45309, #d97706)", boxShadow: "0 0 15px rgba(180,83,9,0.4)" }}
-                >
-                  ⚔️ Aceitar Revanche
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { onRespondRematch(false); onLeave(); }}
-                  className="rounded-xl px-6 py-5 text-lg font-black text-red-200 transition"
-                  style={{ background: "rgba(127,29,29,0.4)", border: "1px solid rgba(248,113,113,0.5)" }}
-                >
-                  Recusar e Sair
-                </button>
-              </>
-            ) : declinedBy ? (
-              <>
-                <button
-                  type="button"
-                  disabled
-                  className="rounded-xl px-6 py-5 text-lg font-black opacity-50"
-                  style={{ background: "#2d2640", color: "#9ca3af" }}
-                >
-                  Revanche Recusada
-                </button>
-                <button
-                  type="button"
-                  onClick={onLeave}
-                  className="rounded-xl px-6 py-5 text-lg font-black text-white transition"
-                  style={{ background: "#2d2640", border: "1px solid #6d5e9c" }}
-                >
-                  Voltar ao Lobby
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={onRematch}
-                  disabled={awaitingOpponent}
-                  className="rounded-xl px-6 py-5 text-lg font-black text-white transition disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ background: "linear-gradient(135deg, #b45309, #d97706)", boxShadow: "0 0 15px rgba(180,83,9,0.4)" }}
-                >
-                  ⚔️ Pedir Revanche
-                </button>
-                <button
-                  type="button"
-                  onClick={onLeave}
-                  className="rounded-xl px-6 py-5 text-lg font-black text-white transition"
-                  style={{ background: "#2d2640", border: "1px solid #6d5e9c" }}
-                >
-                  Voltar ao Lobby
-                </button>
-              </>
-            )}
+            <section
+              className="grid w-full max-w-md gap-4 rounded-2xl p-5 text-center"
+              style={{ background: "rgba(120,53,15,0.45)", border: "1px solid rgba(217,119,6,0.65)", boxShadow: "0 20px 60px rgba(0,0,0,0.45)" }}
+            >
+              <h2 id="disconnect-overlay-title" className="text-2xl font-black text-amber-100">
+                Oponente desconectou
+              </h2>
+              <p className="text-base font-semibold text-amber-50/90">{opponentDisconnected}</p>
+              <button
+                ref={overlayPrimaryRef}
+                type="button"
+                onClick={onLeave}
+                className="rounded-xl px-6 py-4 text-lg font-black text-white transition focus:outline-none focus:ring-2 focus:ring-amber-300"
+                style={{ background: "#2d2640", border: "1px solid #6d5e9c" }}
+              >
+                Sair
+              </button>
+            </section>
           </div>
-        </section>
-      )}
+        )}
+
+        {showFinishedOverlay && (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center rounded-xl p-4"
+            style={{ background: "rgba(13,11,26,0.78)", backdropFilter: "blur(2px)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="endgame-overlay-title"
+          >
+            <section
+              className="grid w-full max-w-xl gap-3 rounded-2xl p-5 text-center"
+              style={{ background: "linear-gradient(to bottom, #2d2640, #151122)", border: "1px solid #6d5e9c", boxShadow: "0 20px 60px rgba(0,0,0,0.45)" }}
+            >
+              {role === "SPECTATOR" ? (
+                <>
+                  <h2 id="endgame-overlay-title" className="text-3xl font-black text-amber-100">
+                    Partida finalizada
+                  </h2>
+                  <p className="text-sm font-semibold text-slate-300">
+                    Placar final: {score.playerOne} × {score.playerTwo}
+                  </p>
+                  <div className="mt-2 grid gap-3 sm:grid-cols-1">
+                    <button
+                      ref={overlayPrimaryRef}
+                      type="button"
+                      onClick={onLeave}
+                      className="rounded-xl px-6 py-5 text-lg font-black text-white transition focus:outline-none focus:ring-2 focus:ring-amber-300"
+                      style={{ background: "#2d2640", border: "1px solid #6d5e9c" }}
+                    >
+                      Sair
+                    </button>
+                  </div>
+                </>
+              ) : gameState ? (
+                <>
+                  <h2 id="endgame-overlay-title" className="text-3xl font-black text-amber-100 sm:text-4xl">
+                    {playerOutcomeText(gameState, role)}
+                  </h2>
+                  <p className="text-sm font-semibold text-slate-300">
+                    Placar final: {score.playerOne} × {score.playerTwo}
+                  </p>
+
+                  {awaitingOpponent && (
+                    <p className="font-semibold text-amber-200" role="status" aria-live="polite">
+                      Aguardando o oponente aceitar a revanche…
+                    </p>
+                  )}
+                  {canRespondToRematch && (
+                    <p className="font-semibold text-amber-200" role="status" aria-live="polite">
+                      Seu oponente desafia você para uma revanche. Aceita?
+                    </p>
+                  )}
+                  {declinedBy && (
+                    <p className="font-semibold text-red-300" role="status" aria-live="polite">
+                      {declinedBy === role ? "Você recusou a revanche." : "Revanche recusada pelo oponente."}
+                    </p>
+                  )}
+
+                  <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                    {canRespondToRematch ? (
+                      <>
+                        <button
+                          ref={overlayPrimaryRef}
+                          type="button"
+                          onClick={() => onRespondRematch(true)}
+                          className="rounded-xl px-6 py-5 text-lg font-black text-white transition focus:outline-none focus:ring-2 focus:ring-amber-300"
+                          style={{ background: "linear-gradient(135deg, #b45309, #d97706)", boxShadow: "0 0 15px rgba(180,83,9,0.4)" }}
+                        >
+                          ⚔️ Revanche
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { onRespondRematch(false); onLeave(); }}
+                          className="rounded-xl px-6 py-5 text-lg font-black text-red-200 transition focus:outline-none focus:ring-2 focus:ring-red-300"
+                          style={{ background: "rgba(127,29,29,0.4)", border: "1px solid rgba(248,113,113,0.5)" }}
+                        >
+                          Recusar e Sair
+                        </button>
+                      </>
+                    ) : declinedBy ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled
+                          aria-disabled="true"
+                          className="rounded-xl px-6 py-5 text-lg font-black opacity-50"
+                          style={{ background: "#2d2640", color: "#9ca3af" }}
+                        >
+                          Revanche recusada
+                        </button>
+                        <button
+                          ref={overlayPrimaryRef}
+                          type="button"
+                          onClick={onLeave}
+                          className="rounded-xl px-6 py-5 text-lg font-black text-white transition focus:outline-none focus:ring-2 focus:ring-amber-300"
+                          style={{ background: "#2d2640", border: "1px solid #6d5e9c" }}
+                        >
+                          Sair
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          ref={overlayPrimaryRef}
+                          type="button"
+                          onClick={onRematch}
+                          disabled={awaitingOpponent}
+                          aria-disabled={awaitingOpponent}
+                          className="rounded-xl px-6 py-5 text-lg font-black text-white transition focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+                          style={{ background: "linear-gradient(135deg, #b45309, #d97706)", boxShadow: "0 0 15px rgba(180,83,9,0.4)" }}
+                        >
+                          Revanche
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onLeave}
+                          className="rounded-xl px-6 py-5 text-lg font-black text-white transition focus:outline-none focus:ring-2 focus:ring-amber-300"
+                          style={{ background: "#2d2640", border: "1px solid #6d5e9c" }}
+                        >
+                          Sair
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 id="endgame-overlay-title" className="text-3xl font-black text-amber-100">
+                    Partida finalizada
+                  </h2>
+                  <button
+                    ref={overlayPrimaryRef}
+                    type="button"
+                    onClick={onLeave}
+                    className="rounded-xl px-6 py-5 text-lg font-black text-white transition focus:outline-none focus:ring-2 focus:ring-amber-300"
+                    style={{ background: "#2d2640", border: "1px solid #6d5e9c" }}
+                  >
+                    Sair
+                  </button>
+                </>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
 
       {/* Controles mobile */}
       <div className="grid grid-cols-2 gap-3 sm:hidden">
