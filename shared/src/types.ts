@@ -12,6 +12,8 @@ export interface PaddleState {
   y: number;
   width: number;
   height: number;
+  /** Vida do castelo de 0 a 100 (apenas visual; não afeta regra de vitória). */
+  health: number;
 }
 
 export interface BallState {

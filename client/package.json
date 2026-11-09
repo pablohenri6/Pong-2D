@@ -17,6 +17,7 @@
     "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
+    "@rollup/wasm-node": "4.68.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.1",

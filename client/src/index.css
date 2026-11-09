@@ -1,9 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@400;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  font-family: Inter, system-ui, sans-serif;
-  color: #f8fafc;
-  background: #0f172a;
+  font-family: 'Cinzel', Georgia, serif;
+  color: #e5e7eb;
+  background: #0d0b1a;
 }
 
 body { margin: 0; min-width: 320px; }
